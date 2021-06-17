@@ -146,6 +146,9 @@ poweroff：关机
 ll看到的信息：文件类型 权限 连接数 拥有者 所属群组 文件大小 最后修改时间 名
 文件类型：d 目录， - 文件， l 链接文件， b 可存取设备， c 串口设备(鼠标键盘等)，s 数据接口文件（socket），p 数据传输文件（fifo,pip）
 
+umask xxx：文件预置权限， -S会以ugo wrx显示，但umask则显示当前设置
+    创建文件目录时，会将文件目录的权限将umask（非-S)的权限去掉
+
 修改文件属性与权限：
 chgrp [-R] xxx:修改所属群组, -R 一并修改该目录下所有此目录文件群组
 chown：修改拥有者：chown [-R] userName/group:userName fileName，用户群组必须存在
@@ -153,10 +156,34 @@ chmod: 修改权限：u：用户，g：群组，o：其他，a：全部
         数字法r4 w2 x1，修改时需要将a三个权限组合，如chmod [-R] 777 fName
         符号法：+ - =，使用操作符与权限组合，如 chmod a+x fName
 注意: x只是可被执行状态，真正能否执行得看文件
-      目录赋予x才允许打开，必须x+w才能操作（看增删移动复制等）文件目录
+      目录赋予x才允许打开此时也可以进行复制等读功能，必须x+w才能操作（看增删移动等）文件目录
       目录赋予w能操作但编辑文件需要看文件权限，
       目录赋予r仅能看到目录下的文件列表，但无法看到详细信息
       目录仅有x，目录下文件仅有r，此时能查看文件内容
+chattr [+-=][parm]： 修改文件目录的隐藏属性
+    +-=与chmod一样
+    A：设置A属性时，当存取此文件目录时，atime不会被修改，避免i/o过多存储硬盘（建议使用文件系统挂在参数处理这个项目）
+    S：当修改文件时，会同步写入硬盘
+    a：该文件只能增加数据，不能删除与修改
+    c：存储时自动压缩文件，读取会解压缩
+    d：当dump程序执行时，该文件不被dump背负你
+    i：让一个文件不允许改名，删除，link，写入修改删除数据，root才能设置,但root也无法删除
+    s：删除时永久删除
+    u：删除文件并非真正删除，内容还在硬盘中
+    ext文件系统全支持，xfs只支持AadiS
+lsattr：显示文件隐藏属性
+
+文件特殊权限：4SUID,2SGID,1SBIT
+SUID(Set UID):仅对二进制程序有效，执行者需要有x权限，只在程序过程中有效，执行者具有程序拥有者权限
+    举例说明：修改密码时执行passwd，passwd拥有者时root，用户有x权限，但修改密码需要修改/etc/shadow，而一般用户并没有对shadow的权限。此时赋予SUID权限后执行passwd后就让一般用户暂时拥有root权限去修改shadow
+SGID(Set GID)：仅对二进制程序有效，执行者需要有x权限，只在程序过程中有效，执行者具有程序群组权限
+SBIT(Sticky Bit)：只针对目录有效，用户对目录有wx权限，目录在该目录下简历文件或目录仅有自己与root才有权限删除改名搬移等操作
+    也就是说当拥有这个权限的目录，其下的文件目录只有root与本身才能进行删除操作，其他用户即便777也无法让其消失
+修改时在ugo前面加数字，如chmod 4777 x
+    SUID和SGID分别占用u和g的x位，如果没有x则显示S，有x则显示s
+    SBIT占用o的x位，如果没有x则显示T，有x则显示t
+
+
 
 可分享：可以分享给其他系统挂载使用，能分享到互联网上的
 不可分享：本机运行的系统文件或与程序相关的socket文件等，仅与本身有关
@@ -207,3 +234,163 @@ FHS要求/下的目录
 /var/mail：放置邮件的目录，有的发行版放到/var/spool/mail中，这两个互为链接文件
 /var/run：某些程序或服务启动后，会将其PID放在该目录下，与/run相同，链接到/run中
 /var/spool：通常存放队列数据，所谓队列就是排队等待被其他应用使用的数据，通常使用后被删除
+
+文件目录管理：
+特殊的目录：. .. ~ ~account, -:前一个工作目录
+
+pwd [-P]：获取当前路径， -P意味着当前路径的实际路径而非link路径（当前路径为link时可用）
+mkdir：创建文件夹
+    -m 000 : 设置目录权限权限
+    -p： 递归创建目录
+rmdir：删除 空 目录
+    -p:连同上层的空目录也删除, rmdir -p test1/test2/test3
+
+环境变量$PATH：执行的命令会按顺序从环境变量中的路径去找，因此越靠前越快找到
+    不同身份的PATH不一样，可进行修改
+    为了安全，效率不要将.加到PATH中
+
+ls： 查看文件，目录信息
+    -a：全部文件，连隐藏的文件也显示
+    -A：与上一样，但不出现. ..
+    -d：仅列出目录本身，而不是列出目录内的文件数据（ls dir会出现dir下的文件信息）
+    -f：不排序输出，ls默认以文件名排序
+    -F：根据文件、目录等信息，给予附加数据结构，如：* 代表可执行文件，/ 代表目录， = 代表socket文件，l 代表FIFO文件
+    -h：将文件大小以gb，kb形式列出来
+    -i：列出inodc号码
+    -l：详细信息
+    -n：列出UID与GID而非使用者与群组的名字
+    -r：排序结果反序显示
+    -R：连同子目录一并显示
+    -S：以文件容量大小排序
+    -t：按时间排序
+    --color=never：部根据文件特性给予延伸显示
+    --color=always：显示颜色
+    --color=auto：系统判断是否给予颜色
+    --full-time：完整形式输出时间
+    --time={atime, ctime}：输出的时间为a/ctime而非modifiedtime
+
+cp：复制（Ubuntu默认替换）
+    -a：相当于-dr --preserver=all
+    -d：若源文件为链接文件，那么复制的是链接的文件而非链接文件
+    -f：强制（force），若目标文件存在切无法开启，则移出后再次尝试
+    -i：若目标文件已存在，覆盖前会询问是否进行
+    -l：进行硬式链接的链接文件简历，而非复制文件本身
+    -p：将文件的属性（权限，用户，时间）一并复制，而非使用默认属性（备份常用）
+    -r：递归复制
+    -s：复制为符号链接文件，即快捷方式
+    -u：destination比source旧或者destination不存在才进行复制
+    --preserve=all：除了-p的权限参数外，还加入SELinux属性，links，xattr等也复制了
+
+rm
+    -f：forcce，忽略不存在文件，不出现警告
+    -i：询问模式
+    -r：递归删除目录
+
+mv:移动或更名
+    -f：force，若文件存在，直接覆盖
+    -i：询问模式
+    -u：若目标已存在则source较新才复制
+
+basename：获取路径中最后的名字
+dirname：!basename
+
+cat：查看文件全部内容
+    -A：相当于-vET组合
+    -b：列出行号，仅针对非空白行做行号显示，空白行不标行号
+    -E：断行字符$也显示
+    -n：列出行号，空白行也显示
+    -T：将[tab]以^I显示
+    -v：列出看不出的特殊字符
+tac：与cat一致，但从最后一行开始往上显示
+nl：添加行号打印内容
+    -b a：类似cat -n
+    -b t：类似cat -b
+    -n ln：行号在屏幕最左方显示
+    -n rn：行号自身数字最右方显示，不加0
+    -n rz：行号自身数字最右方显示，加0
+    -w：行号占用字符数
+
+more：翻页查看文档
+    空格：向下翻一页
+    Enter：向下一行
+    /string：向下查找
+    :f ：最底下显示文件名以及目前显示的行数
+    b/ctrl b：向上翻一页
+less：与more基本差不多，man就是less形式打开的
+    空格，PageDowdn：下一页
+    PageUp ：上一页
+    Home：第一页
+    End：最后一页
+    /(?)string：向下查找， ?：向上查找
+    n,N：正反向下一个搜索
+    g：第一行、
+    G：最后一行
+
+head：读取前10行
+    -n num：前num行
+tail：读取后10行
+    -n num：后num行
+    -f：持续读取文件内容，直到强制退出
+od [-t Type]：读取二进制文件
+    -t 后接的Type参数
+    a：默认字符显示
+    c：使用ASCII
+    d[size]：十进制输出，每个整数占用size bytes
+    f[size]：浮点输出，每个整数占用size bytes
+    o[size]：八进制输出，每个整数占用size bytes
+    x[size]：十六进制输出，每个整数占用size bytes
+
+mtime(modification time)：内容修改更新的时间
+ctime(status time)：文件状态修改更新的四件
+atime(access time)：文件被读取修改的时间
+
+touch：修改文件时间或建立新档
+    -a：修改文件atime
+    -c：修改文件时间，不存在不建立新文件
+    -d time：指定修改时间，不用当前时间，time格式为"日期或时间"
+    -m：仅修改mtime
+    -t time：指定修改时间，不用当前时间，time格式为YYYYMMDDhhmm
+
+file：查看文件类型
+
+指令查找：
+which [-a] 指令：查找指令的路径（PATH的顺序）, -a只显示第一个
+
+文件查找：
+whereris [-bmsu] 文件目录名：
+    -l：列出主要的查询目录
+    -b：只找binary文件
+    -m：只找说明文件在manual路径下
+    -s：只找source源文件
+    -u：搜索不在bsm中的特殊文件
+locate / updatedb：在/var/lib/mlocate/下建立的数据库里面的数据查找，所以速度快很多
+    一般发行版每天更新一次，执行updatedb命令会马上刷新（几分钟）
+    -i：忽略大小写
+    -c：仅计算找到的个数
+    -l n：仅输出n行
+    -S：输出locate所使用的的db相关信息，包括数据库文件/目录数量等
+    -r：后面接正规表示法显示方式
+find [PATH] [option] [action]：在硬盘中查找，可使用通配符
+    -mtime [+]n：不含n n天前mtime被修改的文件
+    -mtime -n：含n n天内mtime被修改的文件
+    -newer file：file为存在的文件，列出file还要新的文件目录
+
+    -uid n：用户账号ID为n的记录
+    -gid n：群组ID为n的记录
+    -user name：拥有者为name的文件
+    -group name：群组为name的文件
+    -nouser：拥有者在/etc/passwd中不存在的人
+    -nogroup：拥有者在/etc/group中不存在的人
+
+    -name fname：搜索文件名
+    -size [+-]n：比n大/小的文件， c代表byte，k：kb; 如：find -size +50k
+    -type TYPE：类型为TYPE的,f为正常文件，bc为设备文件，d目录，l链接文件，s socket，p FIFO文件
+    -perm mode：查询权限必须等于mode的文件，如find -perm 4777，只能查到4777的文件
+    -perm -mode：查询权限包含mode的文件，如find -perm 4444，则4555，4777
+    -perm /mode：包含mode的任一权限
+    
+    特殊动作find / -perm /700 -exec ls -l {} \;
+    {}:find找到的内容放置到{}位置中
+    -exec 一直到\; 代表find额外动作起始， \用来转义的
+
+
